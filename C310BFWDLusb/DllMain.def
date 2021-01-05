@@ -1,0 +1,19 @@
+LIBRARY C310BFWDLusb
+
+EXPORTS
+    fwdlusb_open            @1
+    fwdlusb_close           @2
+    fwdlusb_listupPrinter   @3
+    fwdlusb_listupPrinterSN @4
+    fwdlusb_selectPrinter   @5
+    fwdlusb_selectPrinterSN @6
+    fwdlusb_getPrinterInfo  @7
+    fwdlusb_status          @8
+    fwdlusb_statusAll       @9
+    fwdlusb_resetPrinter    @10
+    fwdlusb_updateFirmware  @11
+    fwdlusb_getFirmwareInfo @12
+    fwdlusb_MakeThread      @101
+    fwdlusb_ReleaseThread   @102
+    fwdlusb_AttachThreadCount @103
+    fwdlusb_getErrorLog     @104
