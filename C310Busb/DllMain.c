@@ -9,13 +9,13 @@ static const int8 idNumber = 0x01;
 static const int64 serialNo = 0x3837363534333231;
 static const uint8 cardRFID[] = { 0x3F, 0x69, 0x02, 0x83, 0x22, 0xFA, 0x7F, 0x93, 0xD1, 0xC6, 0xEF, 0xFA };
 
-static const int8 mainFirmware[] =
+static const uint8 mainFirmware[] =
 {
     0x45, 0x30, 0x32, 0x33, 0x33, 0x37, 0x30, 0x30, 0x43, 0x48, 0x43, 0x2D, 0x43, 0x33, 0x31, 0x30,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0x38, 0x30, 0x38, 0x32, 0x31, 0x31, 0x37,
     0x35, 0x39, 0x01, 0x19, 0x10, 0xDB  // E0233700 CHC-C310 1808211759 0119 MAIN
 };
-static const int8 paramFirmware[] =
+static const uint8 paramFirmware[] =
 {
     0x44, 0x30, 0x35, 0x34, 0x35, 0x37, 0x30, 0x30, 0x43, 0x48, 0x43, 0x2D, 0x43, 0x33, 0x31, 0x30,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0x38, 0x30, 0x31, 0x31, 0x34, 0x31, 0x33,
@@ -110,7 +110,7 @@ function chcusb_getPrinterInfo(uint16 tagNumber, uint8* rBuffer, uint32* rLen)
     case 0: //getPaperInfo
         if (*rLen != 0x67) *rLen = 0x67;
         if (rBuffer) memset(rBuffer, 0, *rLen);
-        return 1;
+        break;
     case 3: // getFirmwareVersion
         if (*rLen != 0x99) *rLen = 0x99;
         if (rBuffer)
@@ -126,7 +126,7 @@ function chcusb_getPrinterInfo(uint16 tagNumber, uint8* rBuffer, uint32* rLen)
             i += 0x26;
             memcpy(rBuffer + i, paramFirmware, sizeof(paramFirmware));
         }
-        return 1;
+        break;
     case 5: // getPrintCountInfo
         if (!rBuffer)
         {
@@ -154,10 +154,26 @@ function chcusb_getPrinterInfo(uint16 tagNumber, uint8* rBuffer, uint32* rLen)
             memcpy(rBuffer, bInfo, *rLen);
         }
         break;
+    case 6:
+        *rLen = 32;
+        if (rBuffer) memset(rBuffer, 0, 32);
+        break;
+    case 8:
+        *rLen = 1;
+        if (rBuffer) memset(rBuffer, 0, 1);
+        break;
     case 26: // getPrinterSerial
         if (*rLen != 8) *rLen = 8;
         if (rBuffer) memcpy(rBuffer, &serialNo, 8);
-        return 1;
+        break;
+    case 40:
+        *rLen = 10;
+        if (rBuffer) memset(rBuffer, 0, 10);
+        break;
+    case 50:
+        *rLen = 61;
+        if (rBuffer) memset(rBuffer, 0, 61);
+        break;
     default:
         LogErrorA("Unknown parameter 'tagNumber' value.");
         break;
@@ -520,8 +536,8 @@ function chcusb_commCardRfidReader(uint8* sendData, uint8* rRecvData, uint32 sen
 {
     LogInfoA("C310Busb: chcusb_commCardRfidReader(%p, %p, %d, %p, %p)\n", sendData, rRecvData, sendSize, rRecvSize, rResult);
     memset(rRecvData, 0, 0x20);
-    rRecvData[3] = 0x99; // rfidAppFirmwareVer
-    *rRecvSize = 32;
+    rRecvData[3] = 0x91; // rfidAppFirmwareVer
+    *rRecvSize = 0x20;
     return 1;
 }
 
@@ -570,6 +586,13 @@ function chcusb_color_adjustment(LPCSTR filename, int32 a2, int32 a3, int16 a4, 
 function chcusb_color_adjustmentEx(int32 a1, int32 a2, int32 a3, int16 a4, int16 a5, int64 a6, int64 a7, uint16* rResult)
 {
     LogInfoA("C310Busb: chcusb_color_adjustmentEx(%d, %d, %d, %d, %d, %I64d, %I64d, %p)\n", a1, a2, a3, a4, a5, a6, a7, rResult);
+    *rResult = 0;
+    return 1;
+}
+
+function chcusb_writeIred(uint8* a1, uint8* a2, uint16* rResult)
+{
+    LogInfoA("C310Busb: chcusb_writeIred(%p, %p, %p)\n", a1, a2, rResult);
     *rResult = 0;
     return 1;
 }

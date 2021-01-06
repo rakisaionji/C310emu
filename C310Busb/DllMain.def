@@ -44,6 +44,7 @@ EXPORTS
     chcusb_setLaminatePattern @41
     chcusb_color_adjustment @42
     chcusb_color_adjustmentEx @43
+    chcusb_writeIred        @50
     chcusb_getEEPROM        @58
     chcusb_setParameter     @64
     chcusb_getParameter     @65

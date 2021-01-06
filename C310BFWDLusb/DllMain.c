@@ -5,20 +5,20 @@
 static const int8 idNumber = 0x01;
 static const int64 serialNo = 0x3837363534333231;
 
-static const int8 mainFirmware[] =
+static uint8 mainFirmware[] =
 {
     0x45, 0x30, 0x32, 0x33, 0x33, 0x37, 0x30, 0x30, 0x43, 0x48, 0x43, 0x2D, 0x43, 0x33, 0x31, 0x30,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0x38, 0x30, 0x38, 0x32, 0x31, 0x31, 0x37,
     0x35, 0x39, 0x01, 0x19, 0x10, 0xDB  // E0233700 CHC-C310 1808211759 0119 MAIN
 };
-static const int8 paramFirmware[] =
+static uint8 paramFirmware[] =
 {
     0x44, 0x30, 0x35, 0x34, 0x35, 0x37, 0x30, 0x30, 0x43, 0x48, 0x43, 0x2D, 0x43, 0x33, 0x31, 0x30,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0x38, 0x30, 0x31, 0x31, 0x34, 0x31, 0x33,
     0x34, 0x35, 0x02, 0x01, 0x96, 0x4C  // D0545700 CHC-C310 1801141345 0201 PARAM
 };
 
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
     if (ul_reason_for_call == DLL_PROCESS_ATTACH)
     {
@@ -170,13 +170,6 @@ function fwdlusb_resetPrinter(uint16* rResult)
     return 1;
 }
 
-function fwdlusb_updateFirmware(uint8 update, LPCSTR filename, uint16* rResult)
-{
-    LogInfoA("C310BFWDLusb: fwdlusb_updateFirmware(%d, '%s', %p)\n", update, filename, rResult);
-    *rResult = 0;
-    return 1;
-}
-
 function fwdlusb_getFirmwareVersion(uint8* buffer, int size)
 {
     int8 a;
@@ -207,6 +200,115 @@ function fwdlusb_getFirmwareVersion(uint8* buffer, int size)
     return b;
 }
 
+function fwdlusb_updateFirmware_main(uint8 update, LPCSTR filename, uint16* rResult)
+{
+    DWORD result;
+
+    if (filename)
+    {
+        HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) return 0;
+        {
+            if (rResult) *rResult = 1005;
+            result = 0;
+        }
+
+        DWORD read;
+        uint8 buffer[0x40];
+        result = ReadFile(hFile, buffer, 0x40, &read, NULL);
+        if (result && read > 0x24)
+        {
+            uint8* rBuffer = mainFirmware;
+
+            memcpy(rBuffer, buffer + 0x2, 0x8);
+            memcpy(rBuffer + 0x8, buffer + 0xA, 0x10);
+            memcpy(rBuffer + 0x18, buffer + 0x20, 0xA);
+            *(rBuffer + 0x22) = (uint8)fwdlusb_getFirmwareVersion(buffer + 0x1A, 0x2);
+            *(rBuffer + 0x23) = (uint8)fwdlusb_getFirmwareVersion(buffer + 0x1C, 0x2);
+            memcpy(rBuffer + 0x24, buffer + 0x2A, 0x2);
+
+            if (rResult) *rResult = 0;
+            result = 1;
+        }
+        else
+        {
+            if (rResult) *rResult = 1005;
+            result = 0;
+        }
+    }
+    else
+    {
+        if (rResult) *rResult = 1006;
+        result = 0;
+    }
+
+    return result;
+}
+
+function fwdlusb_updateFirmware_param(uint8 update, LPCSTR filename, uint16* rResult)
+{
+    DWORD result;
+
+    if (filename)
+    {
+        HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) return 0;
+        {
+            if (rResult) *rResult = 1005;
+            result = 0;
+        }
+
+        DWORD read;
+        uint8 buffer[0x40];
+        result = ReadFile(hFile, buffer, 0x40, &read, NULL);
+        if (result && read > 0x24)
+        {
+            uint8* rBuffer = paramFirmware;
+
+            memcpy(rBuffer, buffer + 0x2, 8);
+            memcpy(rBuffer + 0x8, buffer + 0xA, 0x10);
+            memcpy(rBuffer + 0x18, buffer + 0x20, 0xA);
+            memcpy(rBuffer + 0x22, buffer + 0x1A, 0x1);
+            memcpy(rBuffer + 0x23, buffer + 0x1C, 0x1);
+            memcpy(rBuffer + 0x24, buffer + 0x2A, 0x2);
+
+            if (rResult) *rResult = 0;
+            result = 1;
+        }
+        else
+        {
+            if (rResult) *rResult = 1005;
+            result = 0;
+        }
+    }
+    else
+    {
+        if (rResult) *rResult = 1006;
+        result = 0;
+    }
+
+    return result;
+}
+
+function fwdlusb_updateFirmware(uint8 update, LPCSTR filename, uint16* rResult)
+{
+    LogInfoA("C310BFWDLusb: fwdlusb_updateFirmware(%d, '%s', %p)\n", update, filename, rResult);
+
+    if (update == 1)
+    {
+        return fwdlusb_updateFirmware_main(update, filename, rResult);
+    }
+    else if (update == 3)
+    {
+        return fwdlusb_updateFirmware_param(update, filename, rResult);
+    }
+    else
+    {
+        *rResult = 0;
+        return 1;
+    }
+}
+
 function fwdlusb_getFirmwareInfo_main(LPCSTR filename, uint8* rBuffer, uint32* rLen, uint16* rResult)
 {
     DWORD result;
@@ -222,7 +324,7 @@ function fwdlusb_getFirmwareInfo_main(LPCSTR filename, uint8* rBuffer, uint32* r
 
         DWORD read;
         uint8 buffer[0x40];
-        BOOL result = ReadFile(hFile, buffer, 0x40, &read, NULL);
+        result = ReadFile(hFile, buffer, 0x40, &read, NULL);
         if (result && read > 0x24)
         {
             memcpy(rBuffer, buffer + 0x2, 0x8);
@@ -231,8 +333,6 @@ function fwdlusb_getFirmwareInfo_main(LPCSTR filename, uint8* rBuffer, uint32* r
             *(rBuffer + 0x22) = (uint8)fwdlusb_getFirmwareVersion(buffer + 0x1A, 0x2);
             *(rBuffer + 0x23) = (uint8)fwdlusb_getFirmwareVersion(buffer + 0x1C, 0x2);
             memcpy(rBuffer + 0x24, buffer + 0x2A, 0x2);
-
-            // memcpy(&mainFirmware, rBuffer, sizeof(mainFirmware));
 
             if (rResult) *rResult = 0;
             result = 1;
@@ -267,7 +367,7 @@ function fwdlusb_getFirmwareInfo_param(LPCSTR filename, uint8* rBuffer, uint32* 
 
         DWORD read;
         uint8 buffer[0x40];
-        BOOL result = ReadFile(hFile, buffer, 0x40, &read, NULL);
+        result = ReadFile(hFile, buffer, 0x40, &read, NULL);
         if (result && read > 0x24)
         {
             memcpy(rBuffer, buffer + 0x2, 8);
@@ -276,8 +376,6 @@ function fwdlusb_getFirmwareInfo_param(LPCSTR filename, uint8* rBuffer, uint32* 
             memcpy(rBuffer + 0x22, buffer + 0x1A, 0x1);
             memcpy(rBuffer + 0x23, buffer + 0x1C, 0x1);
             memcpy(rBuffer + 0x24, buffer + 0x2A, 0x2);
-
-            // memcpy(&paramFirmware, rBuffer, sizeof(paramFirmware));
 
             if (rResult) *rResult = 0;
             result = 1;
@@ -317,8 +415,8 @@ function fwdlusb_getFirmwareInfo(uint8 update, LPCSTR filename, uint8* rBuffer, 
     }
     else
     {
-        if (rResult) *rResult = 1006;
-        return 0;
+        if (rResult) *rResult = 0;
+        return 1;
     }
 }
 
