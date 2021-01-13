@@ -73,9 +73,9 @@ function fwdlusb_selectPrinter(uint8 printerId, uint16* rResult)
     return 1;
 }
 
-function fwdlusb_selectPrinterSN(uint64 printerSN, uint16* rResult)
+function fwdlusb_selectPrinterSN(uint64* printerSN, uint16* rResult)
 {
-    LogInfoA("C310BFWDLusb: fwdlusb_selectPrinterSN(%I64d, %p)\n", printerSN, rResult);
+    LogInfoA("C310BFWDLusb: fwdlusb_selectPrinterSN(%p, %p)\n", printerSN, rResult);
     *rResult = 0;
     return 1;
 }

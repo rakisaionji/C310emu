@@ -188,6 +188,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Bitmap.c" />
     <ClCompile Include="DllMain.c" />
     <ClCompile Include="FileLogger.c" />
   </ItemGroup>
@@ -195,6 +196,7 @@
     <None Include="DllMain.def" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Bitmap.h" />
     <ClInclude Include="FileLogger.h" />
     <ClInclude Include="ConsoleApp.h" />
     <ClInclude Include="SharpTypes.h" />

@@ -1,6 +1,7 @@
 #include "ConsoleApp.h"
 #include "SharpTypes.h"
 #include "FileLogger.h"
+#include "Bitmap.h"
 
 #define IMAGE_SIZE 0x24FC00
 #define HOLO_SIZE 0xC5400
@@ -22,6 +23,11 @@ static const uint8 paramFirmware[] =
     0x34, 0x35, 0x02, 0x01, 0x96, 0x4C  // D0545700 CHC-C310 1801141345 0201 PARAM
 };
 
+static uint16 WIDTH = 0;
+static uint16 HEIGHT = 0;
+
+static char PRINT_DIR[] = "print";
+
 static int32 PAPERINFO[10];
 static int32 CURVE[3][3];
 static uint8 POLISH[2];
@@ -31,6 +37,11 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 {
     if (ul_reason_for_call == DLL_PROCESS_ATTACH)
     {
+        if (!CreateDirectoryA(PRINT_DIR, NULL) && ERROR_ALREADY_EXISTS != GetLastError())
+        {
+            PRINT_DIR[0] = 0x2E;
+            PRINT_DIR[1] = 0;
+        }
         if (OpenLogFileA("C310Busb"))
         {
             LogInfoA("C310Busb: DLL_PROCESS_ATTACH success.");
@@ -94,9 +105,9 @@ function chcusb_selectPrinter(uint8 printerId, uint16* rResult)
     return 1;
 }
 
-function chcusb_selectPrinterSN(uint64 printerSN, uint16* rResult)
+function chcusb_selectPrinterSN(uint64* printerSN, uint16* rResult)
 {
-    LogInfoA("C310Busb: chcusb_selectPrinterSN(%I64d, %p)\n", printerSN, rResult);
+    LogInfoA("C310Busb: chcusb_selectPrinterSN(%p, %p)\n", printerSN, rResult);
     *rResult = 0;
     return 1;
 }
@@ -192,6 +203,9 @@ function chcusb_imageformat
         "C310Busb: chcusb_getPrinterInfo(%d, %d, %d, %d, %d, %p, %p)\n",
         format, ncomp, depth, width, height, inputImage, rResult
     );
+
+    WIDTH = width;
+    HEIGHT = height;
 
     *rResult = 0;
     return 1;
@@ -311,6 +325,20 @@ function chcusb_write(uint8* data, uint32* writeSize, uint16* rResult)
 {
     SYSTEMTIME t; GetLocalTime(&t);
 
+#ifdef NDEBUG
+
+    char dumpPath[0x80];
+    sprintf_s
+    (
+        dumpPath, 0x80,
+        "%s\\C310Busb_%04d%02d%02d_%02d%02d%02d_write.bmp",
+        PRINT_DIR, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond
+    );
+
+    WriteDataToBitmapFile(dumpPath, 24, WIDTH, HEIGHT, data, IMAGE_SIZE);
+
+#else
+
     char dumpPath[0x80];
     sprintf_s
     (
@@ -321,6 +349,8 @@ function chcusb_write(uint8* data, uint32* writeSize, uint16* rResult)
 
     WriteArrayToFile(dumpPath, data, IMAGE_SIZE, FALSE);
     LogInfoA("C310Busb: chcusb_write(%p, %p, %p) [%s]\n", data, writeSize, rResult, dumpPath);
+
+#endif;
 
     *writeSize = IMAGE_SIZE;
     *rResult = 0;
@@ -353,6 +383,20 @@ function chcusb_writeHolo(uint8* data, uint32* writeSize, uint16* rResult)
 {
     SYSTEMTIME t; GetLocalTime(&t);
 
+#ifdef NDEBUG
+
+    char dumpPath[0x80];
+    sprintf_s
+    (
+        dumpPath, 0x80,
+        "%s\\C310Busb_%04d%02d%02d_%02d%02d%02d_writeHolo.bmp",
+        PRINT_DIR, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond
+    );
+
+    WriteDataToBitmapFile(dumpPath, 8, WIDTH, HEIGHT, data, HOLO_SIZE);
+
+#else
+
     char dumpPath[0x80];
     sprintf_s
     (
@@ -363,6 +407,8 @@ function chcusb_writeHolo(uint8* data, uint32* writeSize, uint16* rResult)
 
     WriteArrayToFile(dumpPath, data, HOLO_SIZE, FALSE);
     LogInfoA("C310Busb: chcusb_writeHolo(%p, %p, %p) [%s]\n", data, writeSize, rResult, dumpPath);
+
+#endif;
 
     *writeSize = HOLO_SIZE;
     *rResult = 0;
