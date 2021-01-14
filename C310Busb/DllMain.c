@@ -8,7 +8,6 @@
 
 static const int8 idNumber = 0x01;
 static const int64 serialNo = 0x3837363534333231;
-static const uint8 cardRFID[] = { 0x3F, 0x69, 0x02, 0x83, 0x22, 0xFA, 0x7F, 0x93, 0xD1, 0xC6, 0xEF, 0xFA };
 
 static const uint8 mainFirmware[] =
 {
@@ -23,6 +22,7 @@ static const uint8 paramFirmware[] =
     0x34, 0x35, 0x02, 0x01, 0x96, 0x4C  // D0545700 CHC-C310 1801141345 0201 PARAM
 };
 
+static uint8 STATUS = 0;
 static uint16 WIDTH = 0;
 static uint16 HEIGHT = 0;
 
@@ -167,7 +167,11 @@ function chcusb_getPrinterInfo(uint16 tagNumber, uint8* rBuffer, uint32* rLen)
         break;
     case 6:
         *rLen = 32;
-        if (rBuffer) memset(rBuffer, 0, 32);
+        if (rBuffer)
+        {
+            memset(rBuffer, 0, 32);
+            rBuffer[0] = 44;
+        }
         break;
     case 8:
         *rLen = 1;
@@ -179,7 +183,13 @@ function chcusb_getPrinterInfo(uint16 tagNumber, uint8* rBuffer, uint32* rLen)
         break;
     case 40:
         *rLen = 10;
-        if (rBuffer) memset(rBuffer, 0, 10);
+        if (rBuffer)
+        {
+            memset(rBuffer, 0, 10);
+            rBuffer[0] = 1;
+            rBuffer[1] = 2;
+            rBuffer[2] = 3;
+        }
         break;
     case 50:
         *rLen = 61;
@@ -309,7 +319,11 @@ function chcusb_statusAll(uint8* idArray, uint16* rResultArray)
 function chcusb_startpage(uint16 postCardState, uint16* pageId, uint16* rResult)
 {
     LogInfoA("C310Busb: chcusb_startpage(%d, %p, %p)\n", postCardState, pageId, rResult);
+
+    STATUS = 2;
+
     *pageId = 1;
+
     *rResult = 0;
     return 1;
 }
@@ -317,6 +331,7 @@ function chcusb_startpage(uint16 postCardState, uint16* pageId, uint16* rResult)
 function chcusb_endpage(uint16* rResult)
 {
     LogInfoA("C310Busb: chcusb_endpage(%p)\n", rResult);
+
     *rResult = 0;
     return 1;
 }
@@ -543,8 +558,19 @@ function chcusb_AttachThreadCount(uint16* rCount, uint16* rMaxCount)
 function chcusb_getPrintIDStatus(uint16 pageId, uint8* rBuffer, uint16* rResult)
 {
     LogInfoA("C310Busb: chcusb_getPrintIDStatus(%d, %p, %p)\n", pageId, rBuffer, rResult);
+
     memset(rBuffer, 0, 8);
-    *((uint16*)(rBuffer + 6)) = 2212;
+
+    if (STATUS > 1)
+    {
+        STATUS = 0;
+        *((uint16*)(rBuffer + 6)) = 2212; // Printing Complete
+    }
+    else
+    {
+        *((uint16*)(rBuffer + 6)) = 2300; // No Printting
+    }
+
     *rResult = 0;
     return 1;
 }
@@ -552,7 +578,17 @@ function chcusb_getPrintIDStatus(uint16 pageId, uint8* rBuffer, uint16* rResult)
 function chcusb_setPrintStandby(uint16 position, uint16* rResult)
 {
     LogInfoA("C310Busb: chcusb_setPrintStandby(%d, %p)\n", position, rResult);
-    *rResult = 0;
+
+    if (STATUS == 0)
+    {
+        STATUS = 1;
+        *rResult = 2100;
+    }
+    else
+    {
+        *rResult = 0;
+    }
+
     return 1;
 }
 
@@ -573,17 +609,84 @@ function chcusb_exitCard(uint16* rResult)
 function chcusb_getCardRfidTID(uint8* rCardTID, uint16* rResult)
 {
     LogInfoA("C310Busb: chcusb_getCardRfidTID(%p, %p)\n", rCardTID, rResult);
-    memcpy(rCardTID, cardRFID, sizeof(cardRFID));
+
+    SYSTEMTIME t; GetLocalTime(&t);
+    srand((UINT)(t.wMilliseconds + t.wSecond));
+    PUINT16 pCardTID = (PUINT16)rCardTID;
+
+    for (BYTE i = 0; i < 6; i++)
+    {
+        pCardTID[i] = (UINT16)(rand() + 1);
+    }
+
     *rResult = 2405;
     return 1;
 }
 
 function chcusb_commCardRfidReader(uint8* sendData, uint8* rRecvData, uint32 sendSize, uint32* rRecvSize, uint16* rResult)
 {
-    LogInfoA("C310Busb: chcusb_commCardRfidReader(%p, %p, %d, %p, %p)\n", sendData, rRecvData, sendSize, rRecvSize, rResult);
-    memset(rRecvData, 0, 0x20);
-    rRecvData[3] = 0x91; // rfidAppFirmwareVer
-    *rRecvSize = 0x20;
+    DWORD dwRecvSize = 0;
+    PUINT16 pbSendData = (PUINT16)sendData;
+    SYSTEMTIME t; GetLocalTime(&t);
+
+#ifdef NDEBUG
+
+    LogInfoA
+    (
+        "C310Busb: chcusb_commCardRfidReader(%p { %d }, %p, %d, %p, %p)\n",
+        sendData, pbSendData[0], rRecvData, sendSize, rRecvSize, rResult
+    );
+
+#else
+
+    char dumpPath[0x80];
+    sprintf_s
+    (
+        dumpPath, 0x80,
+        "C310Busb_%04d%02d%02d_%02d%02d%02d_commCardRfidReader.bin",
+        t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond
+    );
+
+    WriteArrayToFile(dumpPath, sendData, sendSize, FALSE);
+    LogInfoA
+    (
+        "C310Busb: chcusb_commCardRfidReader(%p { %d }, %p, %d, %p, %p) [%s]\n",
+        sendData, pbSendData[0], rRecvData, sendSize, rRecvSize, rResult, dumpPath
+    );
+
+#endif
+
+    switch (pbSendData[0])
+    {
+    case 65:
+        dwRecvSize = 0x8;
+        memset(rRecvData, 0, dwRecvSize);
+        break;
+    case 66:    // getRFIDFirmwareVersion
+        dwRecvSize = 0x20;
+        memset(rRecvData, 0, dwRecvSize);
+        rRecvData[3] = 0x91;    // rfidAppFirmwareVer
+        break;
+    case 129:   // checkRFIDReaderStatus
+        dwRecvSize = 0x8;
+        memset(rRecvData, 0, dwRecvSize);
+        break;
+    case 132:
+        dwRecvSize = 0x20;
+        memset(rRecvData, 0, dwRecvSize);
+        rRecvData[3] = 0x91;
+        break;
+    case 133:
+        dwRecvSize = 0x3;
+        memset(rRecvData, 0, dwRecvSize);
+        rRecvData[2] = 0x91;
+        break;
+    default:
+        break;
+    }
+
+    *rRecvSize = dwRecvSize;
+    *rResult = 0;
     return 1;
 }
 
